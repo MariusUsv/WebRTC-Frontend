@@ -127,6 +127,7 @@ export default function App() {
   const localStreamRef = useRef(null);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const iceQueueRef = useRef([]); // AICI se vor stoca pachetele ICE ajunse prea devreme
 
   const bottomRef = useRef(null);
   const messagesAreaRef = useRef(null);
@@ -287,7 +288,6 @@ export default function App() {
       }
 
     } catch (err) {
-      console.error(err);
       endCall();
     }
   }
@@ -303,6 +303,7 @@ export default function App() {
     }
     setActiveCall(null);
     setIncomingCall(null);
+    iceQueueRef.current = []; // Resetăm coada
   }
 
   function startCall() {
@@ -311,13 +312,15 @@ export default function App() {
     wsSend({ type: "call_invite", to_user_id: selected.user_id, caller_name: meName });
   }
 
-  function acceptCall() {
+  async function acceptCall() {
     if (!incomingCall) return;
     const callerId = incomingCall.from_user_id;
     setActiveCall({ user_id: callerId, full_name: incomingCall.caller_name, status: "connected" });
     setIncomingCall(null);
+    
+    // Așteptăm pornirea camerei înainte de a confirma acceptul
+    await setupWebRTC(callerId, false);
     wsSend({ type: "call_accept", to_user_id: callerId });
-    setupWebRTC(callerId, false);
   }
 
   function rejectCall() {
@@ -366,26 +369,45 @@ export default function App() {
       }
       if (msg.type === "call_accept") {
         setActiveCall(prev => prev ? { ...prev, status: "connected" } : prev);
-        setupWebRTC(msg.from_user_id, true);
+        await setupWebRTC(msg.from_user_id, true);
         return;
       }
       if (msg.type === "call_reject" || msg.type === "call_hangup") {
         endCall();
         return;
       }
-      if (msg.type === "webrtc_offer" && pcRef.current) {
-        await pcRef.current.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-        const answer = await pcRef.current.createAnswer();
-        await pcRef.current.setLocalDescription(answer);
-        wsSend({ type: "webrtc_answer", to_user_id: msg.from_user_id, sdp: pcRef.current.localDescription });
+      if (msg.type === "webrtc_offer") {
+        if (!pcRef.current) await setupWebRTC(msg.from_user_id, false);
+        if (pcRef.current) {
+            await pcRef.current.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+            const answer = await pcRef.current.createAnswer();
+            await pcRef.current.setLocalDescription(answer);
+            wsSend({ type: "webrtc_answer", to_user_id: msg.from_user_id, sdp: pcRef.current.localDescription });
+            
+            // Procesăm pachetele de date puse în coadă
+            iceQueueRef.current.forEach(async (c) => {
+                try { await pcRef.current.addIceCandidate(new RTCIceCandidate(c)); } catch(e){}
+            });
+            iceQueueRef.current = [];
+        }
         return;
       }
       if (msg.type === "webrtc_answer" && pcRef.current) {
         await pcRef.current.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+        // Procesăm pachetele de date puse în coadă
+        iceQueueRef.current.forEach(async (c) => {
+            try { await pcRef.current.addIceCandidate(new RTCIceCandidate(c)); } catch(e){}
+        });
+        iceQueueRef.current = [];
         return;
       }
-      if (msg.type === "webrtc_ice" && pcRef.current && msg.candidate) {
-        try { await pcRef.current.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch(e){}
+      if (msg.type === "webrtc_ice" && msg.candidate) {
+        if (pcRef.current && pcRef.current.remoteDescription) {
+            try { await pcRef.current.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch(e){}
+        } else {
+            // Dacă conexiunea nu e complet gata, adăugăm pachetul în coadă
+            iceQueueRef.current.push(msg.candidate);
+        }
         return;
       }
 
@@ -445,7 +467,8 @@ export default function App() {
       const now = Date.now();
       const next = {};
       (contactsRef.current || []).forEach((c) => {
-        next[c.user_id] = (now - (lastPongRef.current.get(c.user_id) || 0)) < 12000;
+        const isOnlineViaWS = (now - (lastPongRef.current.get(c.user_id) || 0)) < 12000;
+        next[c.user_id] = isOnlineViaWS || c.is_online;
       });
       setOnlineMap(next);
     }, 5000);
@@ -534,7 +557,7 @@ export default function App() {
             <video ref={remoteVideoRef} autoPlay playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             <video ref={localVideoRef} autoPlay playsInline muted style={{ position: "absolute", bottom: 20, right: 20, width: 160, borderRadius: 12, border: "2px solid rgba(255,255,255,0.2)" }} />
             <div style={{ position: "absolute", top: 20, left: 20, background: "rgba(0,0,0,0.5)", padding: "8px 16px", borderRadius: 20 }}>
-               {activeCall.status === "calling" ? `Calling ${activeCall.full_name || activeCall.phone}...` : `In Call with ${activeCall.full_name || activeCall.phone}`}
+               {activeCall.status === "calling" ? `Calling ${activeCall.contact_name || activeCall.phone}...` : `In Call with ${activeCall.contact_name || activeCall.phone}`}
             </div>
             <button onClick={handleHangup} style={{ position: "absolute", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#f87171", color: "#000", border: "none", padding: "12px 24px", borderRadius: 24, fontSize: 16, fontWeight: 700, cursor: "pointer" }}>
               End Call
@@ -569,7 +592,7 @@ export default function App() {
           <div style={styles.chatHeader}>
             <div style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
               <div style={{ fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {selected ? (selected.full_name || selected.phone) : "Select a contact"}
+                {selected ? (selected.contact_name || selected.phone) : "Select a contact"}
               </div>
               {selected ? (
                 <div style={{ fontSize: 12, opacity: 0.75 }}>{onlineMap[selected.user_id] ? "online" : "offline"}</div>
@@ -646,19 +669,51 @@ export default function App() {
 
 function ContactsArea({ contacts, onlineMap, selected, onSelect, onRefresh, token }) {
   const [addPhone, setAddPhone] = useState("");
+  const [addName, setAddName] = useState("");
   const [err, setErr] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState("");
 
   async function addContact(e) {
     e.preventDefault();
     setErr("");
     const phone = addPhone.trim();
-    if (!phone) return;
+    const name = addName.trim();
+    if (!phone || !name) return;
     try {
-      await api("/contacts/add", { method: "POST", token, body: { phone } });
+      await api("/contacts", { method: "POST", token, body: { phone, contact_name: name } });
       setAddPhone("");
+      setAddName("");
       await onRefresh();
     } catch (e2) {
       setErr(e2?.message || "Failed to add");
+    }
+  }
+
+  async function updateContact(e, id) {
+    e.preventDefault();
+    const name = editName.trim();
+    if (!name) return;
+    try {
+      await api(`/contacts/${id}`, { method: "PUT", token, body: { contact_name: name } });
+      setEditingId(null);
+      setEditName("");
+      await onRefresh();
+    } catch (e2) {
+      setErr(e2?.message || "Failed to update");
+    }
+  }
+
+  async function removeContact(e, id) {
+    e.stopPropagation();
+    try {
+      await api(`/contacts/${id}`, { method: "DELETE", token });
+      await onRefresh();
+      if (selected && selected.id === id) {
+        onSelect(null);
+      }
+    } catch (e2) {
+      setErr(e2?.message || "Failed to delete");
     }
   }
 
@@ -666,14 +721,22 @@ function ContactsArea({ contacts, onlineMap, selected, onSelect, onRefresh, toke
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       <div style={{ padding: "12px 12px 10px" }}>
         <div style={{ fontWeight: 700, marginBottom: 8, opacity: 0.9 }}>Contacts</div>
-        <form onSubmit={addContact} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <form onSubmit={addContact} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <input
-            value={addPhone}
-            onChange={(e) => setAddPhone(e.target.value)}
-            placeholder="Add phone..."
-            style={{ flex: 1, minWidth: 0, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(40, 42, 45, 0.8)", color: "white", outline: "none" }}
+            value={addName}
+            onChange={(e) => setAddName(e.target.value)}
+            placeholder="Name..."
+            style={styles.inputSmall}
           />
-          <button type="submit" style={{ ...styles.smallBtn, flex: "0 0 auto", whiteSpace: "nowrap" }}>Add</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              value={addPhone}
+              onChange={(e) => setAddPhone(e.target.value)}
+              placeholder="Phone..."
+              style={{ ...styles.inputSmall, flex: 1 }}
+            />
+            <button type="submit" style={styles.smallBtn}>Add</button>
+          </div>
         </form>
         {err && <div style={{ color: "#ff9a9a", marginTop: 8, fontSize: 13 }}>{err}</div>}
       </div>
@@ -682,10 +745,21 @@ function ContactsArea({ contacts, onlineMap, selected, onSelect, onRefresh, toke
         {contacts.length === 0 && <div style={{ opacity: 0.75, padding: 12 }}>No contacts yet.</div>}
         {contacts.map((c) => {
           const isSel = selected?.user_id === c.user_id;
-          const online = !!onlineMap[c.user_id];
+          const isOnline = onlineMap[c.user_id] !== undefined ? onlineMap[c.user_id] : c.is_online;
+          
+          if (editingId === c.id) {
+            return (
+              <form key={c.id} onSubmit={(e) => updateContact(e, c.id)} style={{ padding: "10px 12px", background: "rgba(30, 32, 35, 0.8)", borderRadius: 14, marginTop: 8, display: "flex", gap: 8 }}>
+                <input value={editName} onChange={(e) => setEditName(e.target.value)} style={{ ...styles.inputSmall, flex: 1 }} autoFocus />
+                <button type="submit" style={styles.smallBtn}>Save</button>
+                <button type="button" onClick={() => setEditingId(null)} style={{ ...styles.smallBtn, background: "rgba(255,255,255,0.1)" }}>X</button>
+              </form>
+            );
+          }
+
           return (
-            <button
-              key={c.user_id}
+            <div
+              key={c.id}
               onClick={() => onSelect(c)}
               style={{
                 width: "100%", textAlign: "left", padding: "10px 12px", borderRadius: 14,
@@ -693,12 +767,16 @@ function ContactsArea({ contacts, onlineMap, selected, onSelect, onRefresh, toke
                 color: "white", marginTop: 8, cursor: "pointer", display: "flex", alignItems: "center", gap: 10,
               }}
             >
-              <span style={{ width: 10, height: 10, borderRadius: 999, background: online ? "#34d399" : "rgba(255,255,255,0.22)", boxShadow: online ? "0 0 12px rgba(52,211,153,0.6)" : "none", flex: "0 0 auto" }} />
-              <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                <div style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.full_name || c.phone}</div>
-                <div style={{ fontSize: 12, opacity: 0.75 }}>{online ? "online" : "offline"}</div>
+              <span style={{ width: 10, height: 10, borderRadius: 999, background: isOnline ? "#34d399" : "rgba(255,255,255,0.22)", boxShadow: isOnline ? "0 0 12px rgba(52,211,153,0.6)" : "none", flex: "0 0 auto" }} />
+              <div style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
+                <div style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.contact_name}</div>
+                <div style={{ fontSize: 12, opacity: 0.75 }}>{isOnline ? "online" : "offline"}</div>
               </div>
-            </button>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button onClick={(e) => { e.stopPropagation(); setEditName(c.contact_name); setEditingId(c.id); }} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 16 }}>✏️</button>
+                <button onClick={(e) => removeContact(e, c.id)} style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 16 }}>🗑️</button>
+              </div>
+            </div>
           );
         })}
       </div>
@@ -742,9 +820,10 @@ const styles = {
   emojiItem: { width: "100%", aspectRatio: "1 / 1", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(40,42,45,0.65)", color: "white", cursor: "pointer", fontSize: 18, display: "grid", placeItems: "center" },
   sendBtn: { padding: "11px 14px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255, 214, 56, 0.22)", color: "white", cursor: "pointer", fontWeight: 800, letterSpacing: 0.4, whiteSpace: "nowrap" },
   input: { width: "100%", padding: "12px 12px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(40, 42, 45, 0.8)", color: "white", outline: "none", fontSize: 15 },
+  inputSmall: { width: "100%", padding: "8px 10px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(40, 42, 45, 0.8)", color: "white", outline: "none", fontSize: 13 },
   primaryBtn: { width: "100%", padding: "12px 12px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255, 214, 56, 0.24)", color: "white", cursor: "pointer", fontWeight: 800, letterSpacing: 0.4 },
   secondaryBtn: { width: "100%", padding: "11px 12px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(40, 42, 45, 0.7)", color: "white", cursor: "pointer", fontWeight: 700 },
-  smallBtn: { padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255, 214, 56, 0.22)", color: "white", cursor: "pointer", fontWeight: 800 },
+  smallBtn: { padding: "8px 10px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255, 214, 56, 0.22)", color: "white", cursor: "pointer", fontWeight: 800, fontSize: 13 },
   bubble: { maxWidth: "72%", padding: "10px 12px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(40,42,45,0.72)", whiteSpace: "pre-wrap", wordBreak: "break-word", color: "#ffffff" },
   bubbleMine: { background: "rgba(255, 214, 56, 0.18)" },
   bubbleTheirs: { background: "rgba(40,42,45,0.72)" },
