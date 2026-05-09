@@ -1,13 +1,17 @@
 import React from 'react';
+import { PhoneIncoming, PhoneOutgoing, PhoneMissed, Phone } from 'lucide-react';
 import { formatLastSeen, formatDuration } from '../services/formatters';
+import Avatar from './Avatar';
 
 export default function CallsArea({ calls }) {
   if (!calls || calls.length === 0) {
     return (
-      <div style={styles.emptyState} className="msg-animate">
-        <div style={{ fontSize: 50, marginBottom: 15, opacity: 0.5 }}>📞</div>
-        <div style={{ fontSize: 16, fontWeight: 600 }}>Niciun apel recent</div>
-        <div style={{ fontSize: 13, opacity: 0.6, marginTop: 5, textAlign: "center" }}>
+      <div style={S.empty}>
+        <div style={S.emptyIcon}><Phone size={22} /></div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-md)', marginTop: 14 }}>
+          Niciun apel recent
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-lo)', marginTop: 4 }}>
           Istoricul apelurilor tale va apărea aici.
         </div>
       </div>
@@ -15,30 +19,47 @@ export default function CallsArea({ calls }) {
   }
 
   return (
-    <div style={styles.container}>
-      {calls.map((call, idx) => {
-        // Presupunem că ai o modalitate de a ști dacă a fost ratat sau respins
-        const isMissed = call.status === "missed" || call.status === "rejected";
-        // Presupunem că serverul trimite 'outgoing' / 'incoming'
-        const isOutgoing = call.direction === "outgoing"; 
+    <div style={S.list}>
+      {calls.map((c, i) => {
+        const missed = c.status === 'missed' || c.status === 'rejected';
+        const outgoing = c.direction === 'outgoing';
+        const Icon = missed ? PhoneMissed : outgoing ? PhoneOutgoing : PhoneIncoming;
+        
+        const tone = missed ? 'var(--red)' : outgoing ? 'var(--accent)' : 'var(--mint)';
+        const toneSoft = missed ? 'var(--red-soft)' : outgoing ? 'var(--accent-soft)' : 'var(--mint-soft)';
 
         return (
-          <div key={idx} className="hover-scale" style={styles.callCard}>
-            <div style={styles.iconBox(isMissed, isOutgoing)}>
-              {isMissed ? "❌" : (isOutgoing ? "↗" : "↙")}
-            </div>
-            
-            <div style={{ flex: 1 }}>
-              <div style={{ ...styles.name, color: isMissed ? "#ef4444" : "white" }}>
-                {call.contact_name || call.phone || "Necunoscut"}
+          <div key={i} style={S.item} className="hover-lift">
+            <Avatar name={c.contact_name} seed={c.phone || c.contact_name} size={38} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontSize: 14, 
+                fontWeight: 600,
+                color: missed ? '#ff8a96' : 'var(--text-hi)',
+                whiteSpace: 'nowrap', 
+                overflow: 'hidden', 
+                textOverflow: 'ellipsis',
+              }}>
+                {c.contact_name || c.phone || 'Necunoscut'}
               </div>
-              <div style={styles.details}>
-                {isOutgoing ? "Apel efectuat" : (isMissed ? "Apel ratat" : "Apel primit")} • {formatLastSeen(call.created_at)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-lo)', marginTop: 3 }}>
+                <span style={{ color: tone, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <Icon size={11} />
+                  {missed ? 'Ratat' : outgoing ? 'Efectuat' : 'Primit'}
+                </span>
+                <span>·</span>
+                <span>{formatLastSeen(c.created_at)}</span>
               </div>
             </div>
-
-            <div style={styles.duration}>
-              {call.duration > 0 ? formatDuration(call.duration) : "00:00"}
+            <div className="linko-mono" style={{
+              fontSize: 11, 
+              fontWeight: 500,
+              color: tone, 
+              padding: '4px 8px',
+              background: toneSoft, 
+              borderRadius: 8,
+            }}>
+              {c.duration > 0 ? formatDuration(c.duration) : '—'}
             </div>
           </div>
         );
@@ -47,66 +68,43 @@ export default function CallsArea({ calls }) {
   );
 }
 
-const styles = {
-  container: {
-    height: "100%",
-    overflowY: "auto",
-    padding: "10px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "10px"
+const S = {
+  list: { 
+    height: '100%', 
+    overflowY: 'auto', 
+    padding: '8px 12px 12px', 
+    display: 'flex', 
+    flexDirection: 'column', 
+    gap: 4 
   },
-  emptyState: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    height: "100%",
-    padding: "20px",
-    opacity: 0.6
+  empty: {
+    display: 'flex', 
+    flexDirection: 'column',
+    alignItems: 'center', 
+    justifyContent: 'center',
+    height: '100%', 
+    padding: 24, 
+    textAlign: 'center',
   },
-  callCard: {
-    display: "flex",
-    alignItems: "center",
-    gap: "15px",
-    padding: "16px",
-    background: "rgba(0, 0, 0, 0.2)",
-    border: "1px solid rgba(255, 255, 255, 0.05)",
-    borderRadius: "16px",
-    cursor: "pointer",
-    transition: "0.2s"
+  emptyIcon: {
+    width: 56, 
+    height: 56, 
+    borderRadius: 16,
+    background: 'var(--accent-soft)',
+    border: '1px solid rgba(255,214,56,0.2)',
+    color: 'var(--accent)',
+    display: 'grid', 
+    placeItems: 'center',
   },
-  iconBox: (isMissed, isOutgoing) => ({
-    width: "40px",
-    height: "40px",
-    borderRadius: "12px",
-    background: isMissed 
-      ? "rgba(239, 68, 68, 0.15)" 
-      : (isOutgoing ? "rgba(255, 214, 56, 0.15)" : "rgba(52, 211, 153, 0.15)"),
-    color: isMissed 
-      ? "#ef4444" 
-      : (isOutgoing ? "#FFD638" : "#34d399"),
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    fontSize: "18px",
-    fontWeight: "bold"
-  }),
-  name: {
-    fontSize: "15px",
-    fontWeight: "600",
-    marginBottom: "4px"
+  item: {
+    display: 'flex', 
+    alignItems: 'center', 
+    gap: 12,
+    padding: '10px 12px', 
+    borderRadius: 12,
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid var(--border)',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
   },
-  details: {
-    fontSize: "12px",
-    opacity: 0.6
-  },
-  duration: {
-    fontSize: "13px",
-    fontWeight: "500",
-    opacity: 0.8,
-    background: "rgba(255,255,255,0.05)",
-    padding: "4px 8px",
-    borderRadius: "8px"
-  }
 };

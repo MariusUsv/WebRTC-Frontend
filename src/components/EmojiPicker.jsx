@@ -1,37 +1,99 @@
 import React, { useState } from 'react';
 
 const EMOJI_CATS = {
-  "🙂": ["😀","😁","😂","🤣","😊","😍","😘","😉","😎","🤗","🤔","😴","😅","😇","🤩","🙃","😜","😋","😡","😭","🥶","🥵","🤯"],
-  "🐶": ["🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐮","🐷","🐸","🐵","🐔","🐧","🐦","🐤","🦄","🐝","🦋","🐢","🐬"],
-  "🍔": ["🍏","🍌","🍓","🍒","🍍","🥑","🥕","🌶️","🍕","🍔","🍟","🌭","🥪","🍗","🍣","🍩","🍪","🍫","🍿","☕","🧋"],
-  "⚽": ["⚽","🏀","🏈","⚾","🎾","🏐","🏓","🥊","🎮","🎧","🎸","🎹","🎬","📸","✈️","🏖️","🏆","🎉","✨","🔥"],
-  "❤️": ["❤️","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💖","💘","💝","💯","🙏","👏","👍","👎"],
+  '🙂': ['😀','😁','😂','🤣','😊','😍','😘','😉','😎','🤗','🤔','😴','😅','😇','🤩','🙃','😜','😋','😡','😭','🥶','🥵','🤯'],
+  '🐶': ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🐤','🦄','🐝','🦋','🐢','🐬'],
+  '🍔': ['🍏','🍌','🍓','🍒','🍍','🥑','🥕','🌶️','🍕','🍔','🍟','🌭','🥪','🍗','🍣','🍩','🍪','🍫','🍿','☕','🧋'],
+  '⚽': ['⚽','🏀','🏈','⚾','🎾','🏐','🏓','🥊','🎮','🎧','🎸','🎹','🎬','📸','✈️','🏖️','🏆','🎉','✨','🔥'],
+  '❤️': ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💖','💘','💝','💯','🙏','👏','👍','👎'],
 };
 
 export default function EmojiPicker({ onSelectEmoji }) {
-  const [emojiCat, setEmojiCat] = useState("🙂");
+  const [cat, setCat] = useState('🙂');
 
   return (
-    <div id="emoji-popover" style={styles.emojiPopover}>
-      <div style={styles.emojiTabs}>
-        {Object.keys(EMOJI_CATS).map((k) => ( 
-          <button key={k} type="button" onClick={() => setEmojiCat(k)} style={{ ...styles.emojiTab, ...(emojiCat === k ? styles.emojiTabActive : null) }}>{k}</button> 
+    <div style={S.popover} className="scale-in">
+      <div style={S.tabs}>
+        {Object.keys(EMOJI_CATS).map(k => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setCat(k)}
+            style={{ ...S.tab, ...(cat === k ? S.tabActive : null) }}
+          >
+            {k}
+          </button>
         ))}
       </div>
-      <div style={styles.emojiGrid}>
-        {(EMOJI_CATS[emojiCat] || []).map((e) => ( 
-          <button key={e} type="button" style={styles.emojiItem} onClick={() => onSelectEmoji(e)}>{e}</button> 
+      <div style={S.grid}>
+        {EMOJI_CATS[cat].map(e => (
+          <button 
+            key={e} 
+            type="button" 
+            style={S.item} 
+            className="emoji-item-hover"
+            onClick={() => onSelectEmoji(e)}
+          >
+            {e}
+          </button>
         ))}
       </div>
     </div>
   );
 }
 
-const styles = {
-  emojiPopover: { position: "absolute", bottom: 52, left: 0, width: 320, maxWidth: "78vw", padding: 10, borderRadius: 14, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(20,22,24,0.95)", backdropFilter: "blur(10px)", zIndex: 9999 },
-  emojiTabs: { display: "flex", gap: 6, marginBottom: 8 },
-  emojiTab: { padding: "6px 8px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(40,42,45,0.55)", color: "white", cursor: "pointer", fontSize: 14 },
-  emojiTabActive: { background: "rgba(255, 214, 56, 0.18)", border: "1px solid rgba(255, 214, 56, 0.25)" },
-  emojiGrid: { display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 6 },
-  emojiItem: { width: "100%", aspectRatio: "1 / 1", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(40,42,45,0.65)", color: "white", cursor: "pointer", fontSize: 18, display: "grid", placeItems: "center" },
+const S = {
+  popover: {
+    position: 'absolute',
+    bottom: 52,
+    left: 0,
+    width: 320,
+    maxWidth: '78vw',
+    padding: 12,
+    borderRadius: 16,
+    background: 'rgba(15, 18, 24, 0.95)',
+    backdropFilter: 'blur(24px) saturate(140%)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)',
+    zIndex: 9999,
+  },
+  tabs: { 
+    display: 'flex', 
+    gap: 4, 
+    marginBottom: 10 
+  },
+  tab: {
+    flex: 1,
+    padding: '8px 6px',
+    borderRadius: 10,
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+    background: 'rgba(255, 255, 255, 0.03)',
+    color: 'white',
+    cursor: 'pointer',
+    fontSize: 16,
+    transition: 'all 0.15s ease',
+  },
+  tabActive: {
+    background: 'rgba(255, 214, 56, 0.12)',
+    border: '1px solid rgba(255, 214, 56, 0.35)',
+  },
+  grid: { 
+    display: 'grid', 
+    gridTemplateColumns: 'repeat(8, 1fr)', 
+    gap: 4, 
+    maxHeight: 220, 
+    overflowY: 'auto' 
+  },
+  item: {
+    width: '100%',
+    aspectRatio: '1 / 1',
+    borderRadius: 8,
+    border: 'none',
+    background: 'transparent',
+    cursor: 'pointer',
+    fontSize: 18,
+    display: 'grid',
+    placeItems: 'center',
+    transition: 'background 0.15s ease',
+  },
 };
