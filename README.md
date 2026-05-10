@@ -92,6 +92,7 @@ VITE_WS_URL=ws://localhost:10000/ws
 Run:
 
 npm run dev
+
 ☁️ Production
 
 Environment variables:
