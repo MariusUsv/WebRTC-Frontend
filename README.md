@@ -1,47 +1,105 @@
-# ⚡ LINKO — Web Client (Frontend)
+# 💬 Linko Pro — Real-Time Chat & Video (Frontend)
 
-Acesta este clientul web pentru aplicația **LINKO**, construit cu focus pe viteză, securitate și o experiență de utilizare fluidă (Zero-Lag). Aplicația procesează criptarea și conexiunile P2P exclusiv în browser, garantând confidențialitatea utilizatorilor.
+![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)
+![Vite](https://img.shields.io/badge/vite-%23646CFF.svg?style=for-the-badge&logo=vite&logoColor=white)
+![WebRTC](https://img.shields.io/badge/WebRTC-333333?style=for-the-badge&logo=webrtc&logoColor=white)
+![Vercel](https://img.shields.io/badge/vercel-%23000000.svg?style=for-the-badge&logo=vercel&logoColor=white)
 
-![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
-![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white)
-![WebRTC](https://img.shields.io/badge/WebRTC-P2P_Video-333333?logo=webrtc)
+Frontend client for **Linko Pro**, a secure real-time communication platform featuring encrypted messaging and peer-to-peer video calls directly in the browser.
 
-## 🏗️ Arhitectură și Structură
+🟢 **Live App:** https://web-rtc-frontend-swart.vercel.app
 
-Proiectul nu folosește soluții generice (precum Socket.io), ci implementează conexiuni native pentru a menține un control strict asupra securității și performanței. Logica aplicației este separată pe responsabilități (Separation of Concerns) folosind Custom Hooks:
+---
 
-* 📁 **`src/hooks/`** - "Creierul" aplicației.
-  * `useE2EE.js`: Gestionează derivarea cheilor AES cu Web Crypto API și previne spam-ul de request-uri către API prin memoizare (`useRef`).
-  * `useChat.js`: Gestionează starea mesajelor, indicatorii de typing și Optimistic UI-ul (afișarea instantanee a mesajelor).
-  * `useWebRTC.js`: Gestionează complet fluxurile media (cameră/microfon) și conexiunea P2P.
-  * `useWebSocket.js`: Orchestratorul principal care rutează pachetele către chat sau WebRTC.
-* 📁 **`src/services/`** - Utilitare (apeluri API, formatare, SFX, servicii criptografice).
-* 📁 **`src/components/`** - Componente de UI reutilizabile (Avatar, EmojiPicker, MessageBubble).
-* 📁 **`src/pages/`** - Vizualizările principale (`Login.jsx`, `ChatPage.jsx`).
+## ⚡ TL;DR
+- WebSocket-based real-time messaging  
+- Peer-to-Peer video calls via WebRTC  
+- End-to-End Encryption (Web Crypto API)  
+- Optimistic UI for instant feedback  
 
-## ✨ Funcționalități Frontend-Only
+---
 
-* **Optimistic UI:** Mesajele apar instantaneu pe ecran la apăsarea butonului de trimitere, oferind iluzia unui ping de 0ms, confirmarea serverului venind silențios în fundal.
-* **Drag & Drop Interactiv:** Interfața reacționează vizual (overlay blurat) când un fișier este tras peste ecran.
-* **Eroare și Feedback (UX):** Folosind `react-hot-toast`, orice eroare de rețea sau permisiune hardware (ex. cameră blocată) este comunicată elegant utilizatorului.
-* **Design "Aurora Noir":** 3 teme dinamice (Dark, Light, Cosmic) gestionate global prin variabile CSS și sincronizate cu `localStorage`.
+## 🚀 Core Features
+- 💬 **Real-Time Messaging** — instant communication using native WebSockets  
+- 🔐 **End-to-End Encryption** — messages encrypted locally (AES-GCM, ECDH)  
+- 🎥 **WebRTC Video Calls** — direct P2P connections (no media server)  
+- ⚡ **Optimistic UI** — messages rendered instantly before server confirmation  
+- 📱 **Responsive Design** — optimized for desktop and mobile  
 
-## 🚀 Instalare și Rulare Locală
+---
 
-### 1. Configurare Variabile de Mediu
-Creează un fișier `.env` în rădăcina folderului `frontend`:
-```env
-VITE_API_URL=[http://127.0.0.1:8000](http://127.0.0.1:8000)
-VITE_WS_URL=ws://127.0.0.1:8000/ws
-(Notă: Pentru producție, înlocuiește cu URL-urile de la Render/Backend).
+## 🧩 Architecture
+src/
+├── components/ # UI components (Chat, Video, UI elements)
+├── hooks/ # Core logic (useWebSocket, useWebRTC, useE2EE)
+├── services/ # API + crypto helpers
+├── pages/ # Views (Auth, Chat)
+└── App.jsx # Routing & providers
 
-2. Instalare Dependințe
-Bash
+
+### Core Concepts
+- **Custom Hooks** → separation of concerns (logic vs UI)  
+- **WebSockets** → messaging + signaling  
+- **WebRTC** → media streaming  
+- **E2EE Layer** → client-side encryption before transmission  
+
+---
+
+## 🔒 End-to-End Encryption
+- Public keys exchanged via backend API  
+- Shared secrets derived locally (ECDH)  
+- Messages encrypted with AES-GCM  
+- Backend only handles ciphertext (Zero-Knowledge)  
+
+---
+
+## 🎥 WebRTC Flow
+1. `createOffer()` → sent via WebSocket  
+2. Remote client sets `RemoteDescription`  
+3. `createAnswer()` → returned to caller  
+4. ICE candidates exchanged  
+5. Direct P2P connection established  
+
+---
+
+## ⚠️ Key Engineering Challenges
+- **Async State Sync** — aligning UI with unpredictable WebSocket events  
+- **Media Lifecycle** — handling `getUserMedia`, cleanup, avoiding leaks  
+- **WebRTC Timing** — managing signaling order & ICE candidates  
+- **Crypto Integration** — running encryption without blocking UI  
+
+---
+
+## 🛠️ Tech Stack
+- React 18 + Vite  
+- WebSockets API  
+- WebRTC (`RTCPeerConnection`)  
+- Web Crypto API  
+- Vercel (deployment)  
+
+---
+
+## 💻 Local Development
+git clone https://github.com/MariusUsv/WebRTC-Frontend.git
+cd WebRTC-Frontend
 npm install
-3. Pornire Server de Dezvoltare
-Bash
+
+Create .env:
+
+VITE_API_URL=http://localhost:10000
+VITE_WS_URL=ws://localhost:10000/ws
+
+Run:
+
 npm run dev
-4. Build pentru Producție
-Bash
-npm run build
-Aplicația va fi compilată și optimizată în folderul /dist, pregătită pentru deploy pe Vercel, Netlify sau Cloudflare Pages.
+☁️ Production
+
+Environment variables:
+
+VITE_API_URL=https://your-backend.onrender.com
+VITE_WS_URL=wss://your-backend.onrender.com/ws
+🔗 Related
+
+Backend: https://github.com/MariusUsv/WebRTC-Backend
+
+⚡ Built with focus on real-time performance, security, and clean architecture.
