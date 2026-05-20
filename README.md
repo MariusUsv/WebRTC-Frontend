@@ -1,11 +1,11 @@
-# 💬 Linko Pro — Real-Time Chat & Video (Frontend)
+# 💬 Linko  — Real-Time Chat & Video (Frontend)
 
 ![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)
 ![Vite](https://img.shields.io/badge/vite-%23646CFF.svg?style=for-the-badge&logo=vite&logoColor=white)
 ![WebRTC](https://img.shields.io/badge/WebRTC-333333?style=for-the-badge&logo=webrtc&logoColor=white)
 ![Vercel](https://img.shields.io/badge/vercel-%23000000.svg?style=for-the-badge&logo=vercel&logoColor=white)
 
-Frontend client for **Linko Pro**, a secure real-time communication platform featuring encrypted messaging and peer-to-peer video calls directly in the browser.
+Frontend client for **Linko**, a secure real-time communication platform featuring encrypted messaging and peer-to-peer video calls directly in the browser.
 
 🟢 **Live App:** https://web-rtc-frontend-swart.vercel.app
 
