@@ -44,23 +44,32 @@ export function useWebRTC({ wsSend, loadCalls }) {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localStreamRef.current = stream;
       
-      // --- AICI ESTE CONFIGURAȚIA NOUĂ PENTRU COTURN (STUN + TURN) ---
+      // --- AICI ESTE CONFIGURAȚIA NOUĂ ȘI SIGURĂ DE LA METERED ---
       const iceConfig = {
         iceServers: [
-          { 
-            urls: [
-              "stun:stun1.l.google.com:19302", 
-              "stun:stun2.l.google.com:19302"
-            ] 
+          {
+            urls: "stun:stun.relay.metered.ca:80",
           },
           {
-            urls: [
-              `turn:${import.meta.env.VITE_COTURN_IP}:3478`,
-              `turn:${import.meta.env.VITE_COTURN_IP}:5349`
-            ],
-            username: import.meta.env.VITE_TURN_USERNAME,
-            credential: import.meta.env.VITE_TURN_PASSWORD
-          }
+            urls: "turn:global.relay.metered.ca:80",
+            username: "abfc9470e37df655fd12b4a3",
+            credential: "lE/PCkSUaV5miSlE",
+          },
+          {
+            urls: "turn:global.relay.metered.ca:80?transport=tcp",
+            username: "abfc9470e37df655fd12b4a3",
+            credential: "lE/PCkSUaV5miSlE",
+          },
+          {
+            urls: "turn:global.relay.metered.ca:443",
+            username: "abfc9470e37df655fd12b4a3",
+            credential: "lE/PCkSUaV5miSlE",
+          },
+          {
+            urls: "turns:global.relay.metered.ca:443?transport=tcp",
+            username: "abfc9470e37df655fd12b4a3",
+            credential: "lE/PCkSUaV5miSlE",
+          },
         ],
         iceTransportPolicy: "all"
       };
