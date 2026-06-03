@@ -43,16 +43,43 @@ export function useWebRTC({ wsSend, loadCalls }) {
       if (pcRef.current) return;
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localStreamRef.current = stream;
-      const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+      
+      // --- AICI ESTE CONFIGURAȚIA NOUĂ PENTRU COTURN (STUN + TURN) ---
+      const iceConfig = {
+        iceServers: [
+          { 
+            urls: [
+              "stun:stun1.l.google.com:19302", 
+              "stun:stun2.l.google.com:19302"
+            ] 
+          },
+          {
+            urls: [
+              `turn:${import.meta.env.VITE_COTURN_IP}:3478`,
+              `turn:${import.meta.env.VITE_COTURN_IP}:5349`
+            ],
+            username: import.meta.env.VITE_TURN_USERNAME,
+            credential: import.meta.env.VITE_TURN_PASSWORD
+          }
+        ],
+        iceTransportPolicy: "all"
+      };
+
+      const pc = new RTCPeerConnection(iceConfig);
+      // ---------------------------------------------------------------
+
       pcRef.current = pc;
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
+      
       pc.ontrack = (ev) => {
         remoteStreamRef.current = ev.streams[0] || new MediaStream([ev.track]);
         tryAttach(remoteVideoRef, remoteStreamRef.current);
       };
+      
       pc.onicecandidate = (e) => {
         if (e.candidate) wsSend({ type: "webrtc_ice", to_user_id: targetId, candidate: e.candidate });
       };
+      
       if (isCaller) {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
