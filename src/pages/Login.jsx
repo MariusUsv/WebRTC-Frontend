@@ -41,28 +41,17 @@ export default function Login({ auth, theme, setTheme }) {
              <button onClick={cycleTheme} style={S.themeBtn} className="hover-lift">
                 {theme === 'dark' ? <Moon size={16} /> : theme === 'light' ? <Sun size={16} /> : <Sparkles size={16} />}
              </button>
-             <span className="linko-tag">v1.0 · BETA</span>
           </div>
         </div>
 
         <div style={S.brandHero}>
           <div style={S.eyebrow}>
-            <Sparkles size={12} /> APELURI & MESAJE END-TO-END
+            <Sparkles size={12} /> APELURI & MESAJE 
           </div>
           <h1 style={S.heroTitle}>
-            Vorbește cu lumea ta.<br />
-            <span style={{ color: 'var(--accent)' }}>În liniște.</span>
+            Vorbește cu prieteni tăi.<br />
+            <span style={{ color: 'var(--accent)' }}>În online.</span>
           </h1>
-          <p style={S.heroLead}>
-            Mesagerie criptată, apeluri video peer-to-peer, fără reclame, fără urmăritori.
-            Doar tu, prietenii tăi și o conexiune curată.
-          </p>
-
-          <div style={S.featGrid}>
-            <Feature icon={<Phone size={16} />} title="Apeluri video P2P" desc="WebRTC direct, fără server intermediar." />
-            <Feature icon={<ShieldCheck size={16} />} title="Mesaje sigure" desc="Token JWT, sesiuni izolate per tab." />
-            <Feature icon={<Sparkles size={16} />} title="Status în timp real" desc='"Online", "scrie...", citit — totul live.' />
-          </div>
         </div>
 
         <div style={S.brandFooter}>
