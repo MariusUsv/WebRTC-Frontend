@@ -69,9 +69,11 @@ export default function ChatPage({ auth, theme, setTheme }) {
     chatHook.bottomRef?.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHook.messages, chatHook.typingMap]);
 
+  // 🔥 Logica inteligentă pentru trimiterea de fișiere (Anti-Dublare)
   const handleSendFile = async (file) => {
     if (!file || !selected) return;
     
+    // 1. Bula temporară pentru feedback vizual rapid
     const tempId = 'temp-file-' + Date.now();
     const tempMsg = {
       message_id: tempId,
@@ -85,6 +87,7 @@ export default function ChatPage({ auth, theme, setTheme }) {
     chatHook.appendMessage(tempMsg);
     if(sfx.send) sfx.send();
 
+    // 2. Upload-ul efectiv către server
     const formData = new FormData();
     formData.append('file', file);
     try {
@@ -93,9 +96,20 @@ export default function ChatPage({ auth, theme, setTheme }) {
         headers: { Authorization: `Bearer ${auth.token}` }, 
         body: formData,
       });
+      
       if (!r.ok) throw new Error('Eroare la server');
       const newMsg = await r.json();
-      chatHook.setMessages(prev => prev.map(m => m.message_id === tempId ? newMsg : m));
+
+      // 3. Verificarea anti-dublare (Race Condition)
+      chatHook.setMessages(prev => {
+        const alreadyExistsViaWS = prev.some(m => m.message_id === newMsg.message_id);
+        if (alreadyExistsViaWS) {
+          // Dacă WebSocket-ul a fost mai rapid, ștergem bula falsă de pe ecran
+          return prev.filter(m => m.message_id !== tempId);
+        }
+        // Dacă HTTP-ul a fost mai rapid, înlocuim bula falsă cu mesajul real
+        return prev.map(m => m.message_id === tempId ? newMsg : m);
+      });
     } catch (err) { 
       chatHook.setMessages(prev => prev.filter(m => m.message_id !== tempId));
       toast.error("Eroare la trimiterea fișierului. Te rugăm să încerci din nou.");
@@ -297,7 +311,6 @@ export default function ChatPage({ auth, theme, setTheme }) {
           {selected ? (
             <>
               <header style={S.chatHead}>
-                {/* 🔥 BUTONUL DE BACK PE MOBIL */}
                 {isMobile && (
                   <button 
                     onClick={() => setSelected(null)} 
@@ -470,7 +483,7 @@ function CallOverlay({ children }) {
 const S = {
   app: (isMobile) => ({ 
     width: '100vw', 
-    height: '100dvh', // Schimbat în dvh pentru a bloca deformările barei de adrese din browserele mobile
+    height: '100dvh',
     position: 'relative', 
     zIndex: 2, 
     color: 'var(--text-hi)', 
@@ -486,7 +499,7 @@ const S = {
     overflow: 'hidden'
   }),
   sidebar: (isMobile, selected) => ({ 
-    display: isMobile && selected ? 'none' : 'flex', // Ascundem lista dacă pe mobil e deschis un chat
+    display: isMobile && selected ? 'none' : 'flex',
     flexDirection: 'column', 
     minHeight: 0,
     width: isMobile ? '100%' : undefined,
@@ -532,7 +545,7 @@ const S = {
     fontWeight: 700, letterSpacing: 0.4,
   },
   main: (isMobile, selected) => ({ 
-    display: isMobile && !selected ? 'none' : 'flex', // Ascundem chat-ul pe mobil dacă nu e nimic selectat
+    display: isMobile && !selected ? 'none' : 'flex',
     flexDirection: 'column', 
     minHeight: 0,
     width: isMobile ? '100%' : undefined,
