@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, X } from 'lucide-react';
+import { Check, X, FileText, Download } from 'lucide-react';
 import { formatMessageTime } from '../services/formatters';
 import { API_BASE } from '../services/api';
 
@@ -8,10 +8,31 @@ export default function MessageBubble({ m, mine, mePhone, onReact }) {
 
   const getImageUrl = (url) => {
     if (!url) return null;
-    if (url.startsWith('http')) return url;
+    if (url.startsWith('http') || url.startsWith('blob:')) return url;
     return `${API_BASE || ''}/${url.replace(/^\/+/, '')}`;
   };
-  const imageUrl = getImageUrl(m.file_url);
+  const fileUrl = getImageUrl(m.file_url);
+
+  // Funcție care verifică dacă fișierul este imagine sau document
+  const isImage = (url) => {
+    if (!url) return false;
+    if (url.startsWith('blob:')) return true; // Previzualizările locale sunt imagini
+    return /\.(jpeg|jpg|gif|png|webp|bmp|svg)(\?.*)?$/i.test(url);
+  };
+
+  // Extragem numele fișierului din URL dacă backend-ul nu ne dă un nume clar
+  const extractFileName = (url) => {
+    if (!url) return 'Document atașat';
+    try {
+      const parts = url.split('/');
+      const lastPart = parts[parts.length - 1].split('?')[0];
+      return decodeURIComponent(lastPart) || 'Document atașat';
+    } catch {
+      return 'Document atașat';
+    }
+  };
+
+  const isImgFile = isImage(m.file_url);
 
   // Agregăm reacțiile primite de la server/WS: emoji -> { count, mine }
   const reactionGroups = {};
@@ -29,21 +50,44 @@ export default function MessageBubble({ m, mine, mePhone, onReact }) {
   return (
     <>
       <div style={S.bubble(mine)} className="msg-animate" data-testid="message-bubble">
-        {/* Imagine / Atașament */}
+        {/* --- SECȚIUNE ATAȘAMENTE --- */}
         {m.file_url && (
-          <img
-            src={imageUrl}
-            alt="atașament"
-            onClick={() => setZoom(true)}
-            style={S.image}
-            className="hover-scale"
-          />
+          <div style={{ marginBottom: m.text ? 8 : 0 }}>
+            {isImgFile ? (
+              /* Randare Imagine */
+              <img
+                src={fileUrl}
+                alt="atașament"
+                onClick={() => setZoom(true)}
+                style={S.image}
+                className="hover-scale"
+              />
+            ) : (
+              /* Randare Document (PDF, Word, etc.) */
+              <a 
+                href={fileUrl} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                download 
+                style={S.documentLink}
+                className="hover-lift"
+              >
+                <div style={S.docIconWrap}>
+                  <FileText size={22} color="var(--accent)" />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                  <span style={S.docName}>{m.file_name || extractFileName(m.file_url)}</span>
+                  <span style={S.docSize}>Apasă pentru a deschide</span>
+                </div>
+                <Download size={18} color="var(--text-dim)" />
+              </a>
+            )}
+          </div>
         )}
 
-        {/* Text Mesaj */}
+        {/* --- SECȚIUNE TEXT MESAJ --- */}
         {m.text && (
           <div style={{
-            marginTop: m.file_url ? 8 : 0,
             lineHeight: 1.5,
             whiteSpace: 'pre-wrap',
             fontSize: 14,
@@ -54,7 +98,7 @@ export default function MessageBubble({ m, mine, mePhone, onReact }) {
           </div>
         )}
 
-        {/* Footer: Ora + Status (Citit/Trimis) */}
+        {/* --- FOOTER: Ora + Status (Citit/Trimis) --- */}
         <div style={S.footer(mine)}>
           {m.pending && (
             <span style={{ fontSize: 9, marginRight: 6, opacity: 0.7 }} title="Se securizează E2EE...">
@@ -80,7 +124,7 @@ export default function MessageBubble({ m, mine, mePhone, onReact }) {
         </div>
       </div>
 
-      {/* Afișare Pill-uri Reacții */}
+      {/* --- PILULE REACȚII --- */}
       {hasReactions && (
         <div style={{ 
           display: 'flex', 
@@ -116,14 +160,14 @@ export default function MessageBubble({ m, mine, mePhone, onReact }) {
         </div>
       )}
 
-      {/* Lightbox pentru Zoom Imagine */}
-      {zoom && m.file_url && (
+      {/* --- LIGHTBOX (ZOOM DOAR PENTRU IMAGINI) --- */}
+      {zoom && isImgFile && (
         <div style={S.lightbox} onClick={() => setZoom(false)} className="msg-animate">
           <button style={S.lightboxClose} onClick={() => setZoom(false)}>
             <X size={18} />
           </button>
           <img 
-            src={imageUrl} 
+            src={fileUrl} 
             alt="zoom" 
             style={S.lightboxImg} 
             onClick={e => e.stopPropagation()} 
@@ -156,6 +200,42 @@ const S = {
     borderRadius: 12,
     cursor: 'zoom-in',
     border: '1px solid var(--border)',
+  },
+  documentLink: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    padding: '10px 14px',
+    background: 'rgba(0, 0, 0, 0.25)',
+    borderRadius: 12,
+    textDecoration: 'none',
+    border: '1px solid rgba(255, 255, 255, 0.05)',
+    width: '100%',
+    minWidth: 200,
+    boxSizing: 'border-box',
+    cursor: 'pointer'
+  },
+  docIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    background: 'rgba(255, 214, 56, 0.1)',
+    display: 'grid',
+    placeItems: 'center'
+  },
+  docName: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: 'var(--text-hi)',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: 160
+  },
+  docSize: {
+    fontSize: 11,
+    color: 'var(--text-dim)',
+    marginTop: 2
   },
   footer: (mine) => ({
     display: 'flex',
