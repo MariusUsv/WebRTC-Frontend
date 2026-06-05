@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Phone, LogOut, Search, Send, Mic, MicOff, Video, VideoOff, PhoneOff, Paperclip, Smile, X, Moon, Sun, Sparkles } from 'lucide-react';
-import toast from 'react-hot-toast'; // <-- IMPORTUL PENTRU NOTIFICĂRI
+import { Phone, LogOut, Search, Send, Mic, MicOff, Video, VideoOff, PhoneOff, Paperclip, Smile, X, Moon, Sun, Sparkles, ArrowLeft } from 'lucide-react';
+import toast from 'react-hot-toast'; 
 import { api, API_BASE } from '../services/api';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { formatLastSeen } from '../services/formatters';
@@ -23,8 +23,17 @@ export default function ChatPage({ auth, theme, setTheme }) {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
+  
+  // Detector dinamic de rezoluție pentru mobil
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   const inputRef = useRef(null);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const chatHook = useWebSocket({ 
     token: auth.token, 
@@ -67,7 +76,7 @@ export default function ChatPage({ auth, theme, setTheme }) {
     const tempMsg = {
       message_id: tempId,
       from_user_id: auth.mePhone || 'me',
-      text: "Se trimite imaginea...",
+      text: "Se trimite fișierul...",
       file_url: URL.createObjectURL(file), 
       created_at: new Date().toISOString(),
       is_read: false
@@ -89,13 +98,12 @@ export default function ChatPage({ auth, theme, setTheme }) {
       chatHook.setMessages(prev => prev.map(m => m.message_id === tempId ? newMsg : m));
     } catch (err) { 
       chatHook.setMessages(prev => prev.filter(m => m.message_id !== tempId));
-      // 🔥 Notificăm utilizatorul în caz de eroare la upload
-      toast.error("Eroare la trimiterea imaginii. Te rugăm să încerci din nou.");
+      toast.error("Eroare la trimiterea fișierului. Te rugăm să încerci din nou.");
     }
   };
 
   const onFileInput = (e) => {
-    handleSendFile(e.target.files[0]);
+    if (e.target.files[0]) handleSendFile(e.target.files[0]);
     e.target.value = null;
   };
 
@@ -114,10 +122,8 @@ export default function ChatPage({ auth, theme, setTheme }) {
     setIsDragging(false);
     if (!selected) return;
     const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) {
+    if (file) {
       handleSendFile(file);
-    } else {
-        toast.error("Format de fișier nesuportat. Te rugăm să alegi o imagine.");
     }
   };
 
@@ -144,13 +150,13 @@ export default function ChatPage({ auth, theme, setTheme }) {
   ).length;
 
   return (
-    <div style={S.app} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+    <div style={S.app(isMobile)} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
       {isDragging && (
         <div className="drag-overlay">
           <div style={{ background: 'var(--bg-elev-2)', padding: '20px 40px', borderRadius: 20, textAlign: 'center', border: '1px solid var(--accent)' }}>
             <Paperclip size={40} color="var(--accent)" style={{ marginBottom: 10 }} />
-            <h3 style={{ margin: 0, color: 'var(--accent)' }}>Lasă imaginea aici</h3>
-            <p style={{ margin: '5px 0 0', color: 'var(--text-lo)', fontSize: 14 }}>pentru a o trimite lui {selected?.contact_name}</p>
+            <h3 style={{ margin: 0, color: 'var(--accent)' }}>Lasă fișierul aici</h3>
+            <p style={{ margin: '5px 0 0', color: 'var(--text-lo)', fontSize: 14 }}>pentru a-l trimite lui {selected?.contact_name}</p>
           </div>
         </div>
       )}
@@ -180,10 +186,10 @@ export default function ChatPage({ auth, theme, setTheme }) {
 
       {chatHook.activeCall && (
         <CallOverlay>
-          <div style={S.activeCallContainer}>
+          <div style={S.activeCallContainer(isMobile)}>
             <div style={S.callTopBar}>
               <span style={S.liveDot} />
-              <span style={{ fontWeight: 600 }}>
+              <span style={{ fontWeight: 600, fontSize: isMobile ? 11 : 13 }}>
                 {chatHook.activeCall.status === 'calling'
                   ? `Se apelează ${chatHook.activeCall.contact_name || chatHook.activeCall.full_name || 'Contact'}`
                   : `În convorbire — ${chatHook.activeCall.contact_name || chatHook.activeCall.full_name || 'Contact'}`}
@@ -193,11 +199,11 @@ export default function ChatPage({ auth, theme, setTheme }) {
             <video ref={chatHook.remoteVideoRef} autoPlay playsInline style={S.remoteVideo} />
             {chatHook.activeCall.status === 'calling' && (
               <div style={S.callingHint}>
-                <Avatar name={chatHook.activeCall.contact_name || chatHook.activeCall.full_name} seed={chatHook.activeCall.user_id} size={120} />
+                <Avatar name={chatHook.activeCall.contact_name || chatHook.activeCall.full_name} seed={chatHook.activeCall.user_id} size={isMobile ? 80 : 120} />
                 <div style={{ marginTop: 20, fontSize: 14, color: 'var(--text-md)' }}>Se stabilește conexiunea...</div>
               </div>
             )}
-            <video ref={chatHook.localVideoRef} autoPlay playsInline muted style={S.localVideo} />
+            <video ref={chatHook.localVideoRef} autoPlay playsInline muted style={S.localVideo(isMobile)} />
             <div style={S.callControls}>
               <button onClick={chatHook.toggleMic} style={S.callCtrlBtn} className="hover-scale" title="Mute">
                 {chatHook.isMicOn ? <Mic size={20} /> : <MicOff size={20} color="var(--red)" />}
@@ -213,8 +219,8 @@ export default function ChatPage({ auth, theme, setTheme }) {
         </CallOverlay>
       )}
 
-      <div style={S.frame}>
-        <aside className="linko-panel" style={S.sidebar}>
+      <div style={S.frame(isMobile)}>
+        <aside className="linko-panel" style={S.sidebar(isMobile, selected)}>
           <div style={S.sideHead}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <Logo size={24} />
@@ -259,7 +265,7 @@ export default function ChatPage({ auth, theme, setTheme }) {
             </button>
           </div>
 
-          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
             {loading ? (
               <div style={{ padding: '4px 12px' }}>
                 {[1, 2, 3, 4].map(i => (
@@ -287,10 +293,20 @@ export default function ChatPage({ auth, theme, setTheme }) {
           </div>
         </aside>
 
-        <main className="linko-panel" style={S.main}>
+        <main className="linko-panel" style={S.main(isMobile, selected)}>
           {selected ? (
             <>
               <header style={S.chatHead}>
+                {/* 🔥 BUTONUL DE BACK PE MOBIL */}
+                {isMobile && (
+                  <button 
+                    onClick={() => setSelected(null)} 
+                    style={{ marginRight: 12, background: 'none', border: 'none', color: 'var(--text-hi)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                  >
+                    <ArrowLeft size={22} />
+                  </button>
+                )}
+                
                 <Avatar
                   name={selected.contact_name || selected.phone}
                   seed={selected.user_id}
@@ -298,7 +314,7 @@ export default function ChatPage({ auth, theme, setTheme }) {
                   online={chatHook.onlineMap?.[selected.user_id] ?? selected.is_online}
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: "'Geist', sans-serif", fontSize: 17, fontWeight: 700, letterSpacing: '-0.01em' }}>
+                  <div style={{ fontFamily: "'Geist', sans-serif", fontSize: 17, fontWeight: 700, letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {selected.contact_name || selected.phone}
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-lo)', marginTop: 2, height: 16 }}>
@@ -319,8 +335,6 @@ export default function ChatPage({ auth, theme, setTheme }) {
               </header>
 
               <div style={S.messages} ref={chatHook.messagesAreaRef}>
-                
-                {/* BANNER E2EE STIL WHATSAPP */}
                 <div style={S.e2eeBanner} className="scale-in">
                   🔒 Mesajele și apelurile sunt criptate end-to-end. Nimeni din afara acestui chat nu le poate citi sau asculta.
                 </div>
@@ -335,7 +349,7 @@ export default function ChatPage({ auth, theme, setTheme }) {
                            style={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', padding: '2px 0', marginBottom: 6 }}>
                         <div onMouseEnter={() => setHoverMsg(m.message_id)}
                              onMouseLeave={() => setHoverMsg(null)}
-                             style={{ position: 'relative', display: 'flex', gap: 10, alignItems: 'flex-end', maxWidth: '70%' }}>
+                             style={{ position: 'relative', display: 'flex', gap: 10, alignItems: 'flex-end', maxWidth: isMobile ? '85%' : '70%' }}>
                           {!mine && (
                             <Avatar name={selected.contact_name} seed={selected.user_id} size={26} />
                           )}
@@ -405,9 +419,9 @@ export default function ChatPage({ auth, theme, setTheme }) {
                     />
                   )}
                 </div>
-                <label style={{ ...S.iconBtn, cursor: 'pointer' }} className="hover-scale" title="Atașează imagine">
+                <label style={{ ...S.iconBtn, cursor: 'pointer' }} className="hover-scale" title="Atașează fișier">
                   <Paperclip size={18} />
-                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={onFileInput} />
+                  <input type="file" accept="*/*" style={{ display: 'none' }} onChange={onFileInput} />
                 </label>
                 <input
                   ref={inputRef}
@@ -454,13 +468,30 @@ function CallOverlay({ children }) {
 }
 
 const S = {
-  app: { width: '100vw', height: '100vh', position: 'relative', zIndex: 2, color: 'var(--text-hi)' },
-  frame: {
+  app: (isMobile) => ({ 
+    width: '100vw', 
+    height: '100dvh', // Schimbat în dvh pentru a bloca deformările barei de adrese din browserele mobile
+    position: 'relative', 
+    zIndex: 2, 
+    color: 'var(--text-hi)', 
+    overflow: 'hidden' 
+  }),
+  frame: (isMobile) => ({
     width: '100%', height: '100%',
-    display: 'grid', gridTemplateColumns: 'clamp(280px, 26vw, 380px) 1fr',
-    gap: 18, padding: 18, boxSizing: 'border-box',
-  },
-  sidebar: { display: 'flex', flexDirection: 'column', minHeight: 0 },
+    display: isMobile ? 'flex' : 'grid',
+    gridTemplateColumns: isMobile ? undefined : 'clamp(280px, 26vw, 380px) 1fr',
+    gap: isMobile ? 0 : 18, 
+    padding: isMobile ? 0 : 18, 
+    boxSizing: 'border-box',
+    overflow: 'hidden'
+  }),
+  sidebar: (isMobile, selected) => ({ 
+    display: isMobile && selected ? 'none' : 'flex', // Ascundem lista dacă pe mobil e deschis un chat
+    flexDirection: 'column', 
+    minHeight: 0,
+    width: isMobile ? '100%' : undefined,
+    height: isMobile ? '100%' : undefined
+  }),
   sideHead: {
     padding: '20px 22px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
   },
@@ -500,7 +531,13 @@ const S = {
     background: 'rgba(45,212,160,0.15)', color: 'var(--mint)',
     fontWeight: 700, letterSpacing: 0.4,
   },
-  main: { display: 'flex', flexDirection: 'column', minHeight: 0 },
+  main: (isMobile, selected) => ({ 
+    display: isMobile && !selected ? 'none' : 'flex', // Ascundem chat-ul pe mobil dacă nu e nimic selectat
+    flexDirection: 'column', 
+    minHeight: 0,
+    width: isMobile ? '100%' : undefined,
+    height: isMobile ? '100%' : undefined
+  }),
   chatHead: {
     padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 14,
     borderBottom: '1px solid var(--border)',
@@ -514,14 +551,14 @@ const S = {
   },
   messages: { flex: 1, overflowY: 'auto', padding: '24px 22px' },
   e2eeBanner: {
-    background: 'rgba(255, 214, 56, 0.1)',
+    background: 'rgba(255, 214, 56, 0.06)',
     color: 'var(--accent)',
     padding: '8px 16px',
     borderRadius: 8,
     fontSize: 12,
     textAlign: 'center',
-    border: '1px solid rgba(255, 214, 56, 0.2)',
-    maxWidth: '80%',
+    border: '1px solid rgba(255, 214, 56, 0.15)',
+    maxWidth: '90%',
     margin: '0 auto 24px auto',
     lineHeight: 1.5
   },
@@ -558,11 +595,11 @@ const S = {
   },
   callOverlay: {
     position: 'fixed', inset: 0,
-    background: 'rgba(5,8,15,0.85)', backdropFilter: 'blur(14px)',
+    background: 'rgba(5,8,15,0.92)', backdropFilter: 'blur(14px)',
     zIndex: 9999, display: 'grid', placeItems: 'center',
   },
   incomingCard: {
-    width: 360, padding: 36, textAlign: 'center',
+    width: 320, padding: '36px 24px', textAlign: 'center',
     border: '1px solid rgba(255,214,56,0.3)',
   },
   callerAvatar: {
@@ -583,25 +620,29 @@ const S = {
     border: 'none', cursor: 'pointer',
     boxShadow: '0 8px 24px rgba(255,77,94,0.35)',
   },
-  activeCallContainer: {
-    position: 'relative', width: '88%', maxWidth: 980, height: '85%',
+  activeCallContainer: (isMobile) => ({
+    position: 'relative', 
+    width: isMobile ? '100%' : '88%', 
+    maxWidth: 980, 
+    height: isMobile ? '100%' : '85%',
     background: 'radial-gradient(circle at 50% 30%, #1a1f2e 0%, #07080c 80%)',
-    borderRadius: 24, overflow: 'hidden',
-    border: '1px solid rgba(255,214,56,0.18)',
+    borderRadius: isMobile ? 0 : 24, 
+    overflow: 'hidden',
+    border: isMobile ? 'none' : '1px solid rgba(255,214,56,0.18)',
     boxShadow: '0 30px 80px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.05)',
-  },
+  }),
   callTopBar: {
     position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)',
     background: 'rgba(15,18,24,0.7)', backdropFilter: 'blur(16px)',
     padding: '8px 18px', borderRadius: 999,
     display: 'flex', alignItems: 'center', gap: 10,
-    fontSize: 13, color: 'var(--text-md)',
+    color: 'var(--text-md)',
     border: '1px solid var(--border)', zIndex: 10,
+    whiteSpace: 'nowrap'
   },
   liveDot: {
     width: 8, height: 8, background: 'var(--red)',
     borderRadius: '50%', boxShadow: '0 0 10px var(--red)',
-    animation: 'pulseRing 1.6s infinite',
   },
   callTimer: { color: 'var(--accent)', fontWeight: 600 },
   remoteVideo: { width: '100%', height: '100%', objectFit: 'cover' },
@@ -609,17 +650,24 @@ const S = {
     position: 'absolute', inset: 0,
     display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'center',
+    zIndex: 2
   },
-  localVideo: {
-    position: 'absolute', bottom: 100, right: 24,
-    width: 160, height: 220, objectFit: 'cover',
-    borderRadius: 16, border: '2px solid rgba(255,255,255,0.15)',
+  localVideo: (isMobile) => ({
+    position: 'absolute', 
+    bottom: isMobile ? 110 : 100, 
+    right: isMobile ? 16 : 24,
+    width: isMobile ? 110 : 160, 
+    height: isMobile ? 150 : 220, 
+    objectFit: 'cover',
+    borderRadius: 16, 
+    border: '2px solid rgba(255,255,255,0.15)',
     boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
     background: '#0a0d14',
-  },
+    zIndex: 5
+  }),
   callControls: {
     position: 'absolute', bottom: 28, left: '50%', transform: 'translateX(-50%)',
-    display: 'flex', gap: 14, alignItems: 'center',
+    display: 'flex', gap: 14, alignItems: 'center', zIndex: 10
   },
   callCtrlBtn: {
     width: 52, height: 52, borderRadius: '50%',
